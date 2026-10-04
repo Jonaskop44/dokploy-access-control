@@ -3,9 +3,6 @@
 /node_modules
 /build
 
-# TypeScript build cache
-*.tsbuildinfo
-
 # Logs
 logs
 *.log
@@ -57,3 +54,8 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+/src/config/prisma/generated
+
+# generated OpenAPI spec (regenerate via `npm run generate:openapi`)
+/openapi.json

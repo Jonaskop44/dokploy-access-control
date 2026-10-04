@@ -1,0 +1,21 @@
+services:
+  dokploy-access-control-db:
+    container_name: dokploy-access-control-db
+    image: postgres:latest
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    networks:
+      - proxy
+    env_file:
+      - "./server/.env"
+    volumes:
+      - dokploy-access-control-db-data:/var/lib/postgresql
+
+volumes:
+  dokploy-access-control-db-data:
+    driver: local
+
+networks:
+  proxy:
+    external: false
