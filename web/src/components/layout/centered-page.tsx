@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { BlurFade } from "@/components/ui/blur-fade";
-import { DotPattern } from "@/components/ui/dot-pattern";
+import { BlurFade } from "@/components/magicui/blur-fade";
+import { DotPattern } from "@/components/magicui/dot-pattern";
 import {
   Empty,
   EmptyContent,
@@ -8,7 +8,7 @@ import {
   EmptyHeader,
   EmptyMedia,
 } from "@/components/ui/empty";
-import { HyperText } from "@/components/ui/hyper-text";
+import { HyperText } from "@/components/magicui/hyper-text";
 
 type CenteredPageProps = {
   eyebrow: string;

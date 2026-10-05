@@ -17,12 +17,17 @@ const buttonVariants = cva(
         dark: "rounded-md bg-foreground text-background",
         // text-link
         link: "text-primary underline-offset-4 hover:underline",
+        // Quiet utility control (sidebar trigger, sheet close)
+        ghost:
+          "rounded-md bg-transparent text-foreground hover:bg-accent aria-expanded:bg-accent",
       },
       size: {
         default:
           "min-h-11 gap-2 px-5.5 py-2.75 text-[17px] leading-[1.47] tracking-[-0.374px] [&_svg:not([class*='size-'])]:size-4.5",
         lg: "min-h-12 gap-2.5 px-7 py-3.5 text-[18px] leading-none font-light [&_svg:not([class*='size-'])]:size-5",
         sm: "gap-1.5 px-3.75 py-2 text-[14px] leading-[1.29] tracking-[-0.224px] [&_svg:not([class*='size-'])]:size-4",
+        icon: "size-9 [&_svg:not([class*='size-'])]:size-4.5",
+        "icon-sm": "size-8 [&_svg:not([class*='size-'])]:size-4",
       },
     },
     defaultVariants: {

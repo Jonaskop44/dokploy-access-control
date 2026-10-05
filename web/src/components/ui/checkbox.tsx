@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox"
-import { cn } from "cn"
-import { CheckIcon } from "lucide-react"
+import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox";
+import { Icon } from "@iconify/react";
+import { cn } from "cn";
 
 function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
   return (
@@ -10,7 +10,7 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
       data-slot="checkbox"
       className={cn(
         "peer relative flex size-4.5 shrink-0 items-center justify-center rounded-xs border border-input bg-background transition-colors group-has-disabled/field:opacity-50 after:absolute after:-inset-x-3 after:-inset-y-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground dark:data-checked:bg-primary",
-        className
+        className,
       )}
       {...props}
     >
@@ -18,10 +18,10 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
         data-slot="checkbox-indicator"
         className="grid place-content-center text-current transition-none [&>svg]:size-3.5"
       >
-        <CheckIcon strokeWidth={3} />
+        <Icon icon="lucide:check" strokeWidth={3} />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
-  )
+  );
 }
 
-export { Checkbox }
+export { Checkbox };

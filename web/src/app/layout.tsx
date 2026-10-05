@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ApiQueryProvider } from "@/api/query-provider";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -29,7 +30,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${inter.variable} ${geistMono.variable}`}
     >
       <body className="antialiased">
-        <ApiQueryProvider>{children}</ApiQueryProvider>
+        <ApiQueryProvider>
+          <TooltipProvider>{children}</TooltipProvider>
+        </ApiQueryProvider>
       </body>
     </html>
   );

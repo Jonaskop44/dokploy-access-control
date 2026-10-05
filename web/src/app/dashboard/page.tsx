@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { UserInfo } from "@/components/dashboard/user-info";
+import { BlurFade } from "@/components/magicui/blur-fade";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -7,12 +8,14 @@ export const metadata: Metadata = {
 
 const DashboardPage = () => {
   return (
-    <main className="min-h-dvh bg-parchment px-6 py-section">
-      <div className="mx-auto flex max-w-2xl flex-col gap-8">
-        <h2>Dashboard</h2>
+    <div className="flex max-w-2xl flex-col gap-8">
+      <BlurFade>
+        <h2>Übersicht</h2>
+      </BlurFade>
+      <BlurFade delay={0.08}>
         <UserInfo />
-      </div>
-    </main>
+      </BlurFade>
+    </div>
   );
 };
 
