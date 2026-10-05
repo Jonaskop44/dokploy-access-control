@@ -24,7 +24,7 @@ export class AuthController {
   @Get('login')
   @Throttle({ default: { ttl: 15 * 60_000, limit: 10 } })
   login(@Query() query: LoginQueryDto, @Res() response: Response) {
-    return this.authService.startLogin(query.rememberMe, response);
+    return this.authService.login(query.rememberMe, response);
   }
 
   @Get('callback')
