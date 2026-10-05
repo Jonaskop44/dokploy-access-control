@@ -10,7 +10,6 @@ import { User } from '../../config/prisma/generated/client.js';
 
 export const ACCESS_COOKIE = 'accessToken';
 export const REFRESH_COOKIE = 'refreshToken';
-export const REFRESH_COOKIE_PATH = '/api/v1/auth/refresh';
 
 @Injectable()
 export class SessionService {
@@ -73,6 +72,11 @@ export class SessionService {
     };
   }
 
+  clearAuthCookies(response: Response) {
+    response.clearCookie(ACCESS_COOKIE, this.cookieOptions('/'));
+    response.clearCookie(REFRESH_COOKIE, this.cookieOptions('/'));
+  }
+
   private async generateTokens(user: User, rememberMe: boolean) {
     const payload: JwtPayload = {
       id: user.id,
@@ -116,7 +120,7 @@ export class SessionService {
     });
 
     response.cookie(REFRESH_COOKIE, refreshToken, {
-      ...this.cookieOptions(REFRESH_COOKIE_PATH),
+      ...this.cookieOptions('/'),
       ...(rememberMe ? { maxAge: refreshExp.exp * 1000 - Date.now() } : {}),
     });
   }

@@ -1,15 +1,9 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { Response } from 'express';
 import { AppConfigService } from '../config/app-config/app-config.service.js';
-import type { User } from '../config/prisma/generated/client.js';
 import { UserService } from '../user/user.service.js';
 import { EntraService } from './entra/entra.service.js';
-import {
-  ACCESS_COOKIE,
-  REFRESH_COOKIE,
-  REFRESH_COOKIE_PATH,
-  SessionService,
-} from './session/session.service.js';
+import { SessionService } from './session/session.service.js';
 
 export const OAUTH_STATE_COOKIE = 'oauthState';
 export const OAUTH_STATE_PATH = '/api/v1/auth/callback';
@@ -79,14 +73,14 @@ export class AuthService {
     }
   }
 
-  refresh(user: User, rememberMe: boolean, response: Response) {
+  async refresh(userId: string, rememberMe: boolean, response: Response) {
+    const user = await this.userService.findById(userId);
     return this.sessionService.completeLogin(user, rememberMe, response);
   }
 
   async logout(userId: string, response: Response) {
     await this.userService.updateHashedRefreshToken(userId, null);
-    response.clearCookie(ACCESS_COOKIE, { path: '/' });
-    response.clearCookie(REFRESH_COOKIE, { path: REFRESH_COOKIE_PATH });
+    this.sessionService.clearAuthCookies(response);
     return { message: 'Logged out successfully' };
   }
 }

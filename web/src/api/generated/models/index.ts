@@ -8,3 +8,5 @@
 
 export * from "./authControllerCallbackParams";
 export * from "./authControllerLoginParams";
+export * from "./userResponseDto";
+export * from "./userResponseDtoRole";

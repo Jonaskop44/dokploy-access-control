@@ -50,7 +50,7 @@ export class AuthController {
     @CurrentUser() user: Express.User,
     @Res({ passthrough: true }) response: Response,
   ) {
-    return this.authService.refresh(user, user.rememberMe, response);
+    return this.authService.refresh(user.id, user.rememberMe, response);
   }
 
   @Post('logout')

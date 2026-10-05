@@ -18,6 +18,8 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
+import type { UserResponseDto } from "../models";
+
 import { customInstance } from "../../axios-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -44,7 +46,7 @@ export const userControllerMe = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
-  return customInstance<void>(
+  return customInstance<UserResponseDto>(
     { url: `/api/v1/user/me`, method: "GET", signal },
     options,
   );
