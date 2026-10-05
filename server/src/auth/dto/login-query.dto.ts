@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 export const LoginQuerySchema = z
   .object({
-    rememberMe: z.boolean().optional().default(false),
+    rememberMe: z.stringbool().optional().default(false),
   })
   .strict();
 
