@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-
 import { BlurFade } from "@/components/ui/blur-fade";
 import { DotPattern } from "@/components/ui/dot-pattern";
 import {
@@ -20,8 +19,6 @@ type CenteredPageProps = {
 
 const STAGGER = 0.08;
 
-// Full-viewport parchment canvas with a centered eyebrow / headline / copy
-// stack. Shared by standalone screens like login and 404.
 export const CenteredPage = ({
   eyebrow,
   title,

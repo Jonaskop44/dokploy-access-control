@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-
 import { CenteredPage } from "@/components/layout/centered-page";
 import { buttonVariants } from "@/components/ui/button";
 

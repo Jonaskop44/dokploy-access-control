@@ -3,7 +3,6 @@
 import { Icon } from "@iconify/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-
 import { axiosInstance } from "@/api/axios-instance";
 import { getAuthControllerLoginQueryKey } from "@/api/generated/auth/auth";
 import { Button } from "@/components/ui/button";
