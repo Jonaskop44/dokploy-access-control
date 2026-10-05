@@ -75,9 +75,7 @@ export class AuthService {
       response.redirect(this.appConfig.frontendUrl);
     } catch (error) {
       this.logger.warn(`Entra login failed: ${(error as Error).message}`);
-      response.redirect(
-        `${this.appConfig.frontendUrl}/login?error=auth_failed`,
-      );
+      response.redirect(`${this.appConfig.frontendUrl}/?error=auth_failed`);
     }
   }
 
