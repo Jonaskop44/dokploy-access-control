@@ -36,8 +36,12 @@ export class AppConfigService {
     return this.configService.getOrThrow('JWT_REFRESH_SECRET');
   }
 
-  get jwtRefreshExpiresIn(): string {
-    return this.configService.getOrThrow('JWT_REFRESH_EXPIRES_IN');
+  jwtRefreshExpiresIn(rememberMe: boolean): string {
+    const refreshExpiresInKey = rememberMe
+      ? 'JWT_REFRESH_EXPIRES_IN'
+      : 'JWT_REFRESH_SESSION_EXPIRES_IN';
+
+    return this.configService.getOrThrow<string>(refreshExpiresInKey);
   }
 
   get cookieDomain(): string | undefined {

@@ -1,10 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import type { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AppConfigService } from '../../config/app-config/app-config.service.js';
-import { REFRESH_COOKIE } from '../session/session.service.js';
-import { AuthService } from '../auth.service.js';
+import { UserService } from '../../user/user.service.js';
+import { REFRESH_COOKIE, SessionService } from '../session/session.service.js';
 import { JwtPayload } from '../types/auth-jwtPayload.js';
 
 @Injectable()
@@ -14,7 +14,8 @@ export class JwtRefreshStrategy extends PassportStrategy(
 ) {
   constructor(
     appConfigService: AppConfigService,
-    private authService: AuthService,
+    private readonly userService: UserService,
+    private readonly sessionService: SessionService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -27,18 +28,13 @@ export class JwtRefreshStrategy extends PassportStrategy(
   }
 
   async validate(request: Request, payload: JwtPayload) {
-    const token: string | undefined = request.cookies?.[REFRESH_COOKIE];
-    const user = await this.userService.findByIdOrNull(payload.sub);
-    if (
-      !token ||
-      !user?.hashedRefreshToken ||
-      !(await this.sessionService.compareRefreshToken(
-        token,
-        user.hashedRefreshToken,
-      ))
-    ) {
-      throw new UnauthorizedException();
-    }
-    return { id: user.id, email: user.email, name: user.name, role: user.role };
+    const refreshToken = request.cookies?.refreshToken;
+    const userId = payload.id;
+
+    const user = await this.sessionService.validateRefreshToken(
+      userId,
+      refreshToken,
+    );
+    return { ...user, rememberMe: payload.sub.rememberMe };
   }
 }

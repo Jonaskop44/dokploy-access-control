@@ -15,6 +15,7 @@ import { JwtRefreshGuard } from '../guards/jwt-refresh.guard.js';
 import { AuthService, OAUTH_STATE_COOKIE } from './auth.service.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
 import { CallbackQueryDto } from './dto/callback-query.dto.js';
+import { LoginQueryDto } from './dto/login-query.dto.js';
 
 @Controller('auth')
 export class AuthController {
@@ -22,8 +23,8 @@ export class AuthController {
 
   @Get('login')
   @Throttle({ default: { ttl: 15 * 60_000, limit: 10 } })
-  login(@Res() response: Response) {
-    return this.authService.startLogin(response);
+  login(@Query() query: LoginQueryDto, @Res() response: Response) {
+    return this.authService.startLogin(query.rememberMe, response);
   }
 
   @Get('callback')
@@ -46,10 +47,10 @@ export class AuthController {
   @Throttle({ default: { ttl: 15 * 60_000, limit: 30 } })
   @UseGuards(JwtRefreshGuard)
   refresh(
-    @CurrentUser('id') userId: string,
+    @CurrentUser() user: Express.User,
     @Res({ passthrough: true }) response: Response,
   ) {
-    return this.authService.refresh(userId, response);
+    return this.authService.refresh(user, user.rememberMe, response);
   }
 
   @Post('logout')

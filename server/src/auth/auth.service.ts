@@ -1,9 +1,15 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { Response } from 'express';
 import { AppConfigService } from '../config/app-config/app-config.service.js';
+import type { User } from '../config/prisma/generated/client.js';
 import { UserService } from '../user/user.service.js';
 import { EntraService } from './entra/entra.service.js';
-import { SessionService } from './session/session.service.js';
+import {
+  ACCESS_COOKIE,
+  REFRESH_COOKIE,
+  REFRESH_COOKIE_PATH,
+  SessionService,
+} from './session/session.service.js';
 
 export const OAUTH_STATE_COOKIE = 'oauthState';
 export const OAUTH_STATE_PATH = '/api/v1/auth/callback';
@@ -19,13 +25,18 @@ export class AuthService {
     private readonly appConfig: AppConfigService,
   ) {}
 
-  async startLogin(response: Response) {
+  async login(rememberMe: boolean, response: Response) {
     const { url, state, verifier } =
       await this.entraService.createAuthRequest();
-    response.cookie(OAUTH_STATE_COOKIE, JSON.stringify({ state, verifier }), {
-      ...this.sessionService.cookieOptions(OAUTH_STATE_PATH),
-      maxAge: 10 * 60_000,
-    });
+
+    response.cookie(
+      OAUTH_STATE_COOKIE,
+      JSON.stringify({ state, verifier, rememberMe }),
+      {
+        ...this.sessionService.cookieOptions(OAUTH_STATE_PATH),
+        maxAge: 10 * 60_000,
+      },
+    );
     response.redirect(url);
   }
 
@@ -41,7 +52,11 @@ export class AuthService {
     );
 
     try {
-      const { state: expectedState, verifier } = JSON.parse(stored ?? '{}');
+      const {
+        state: expectedState,
+        verifier,
+        rememberMe,
+      } = JSON.parse(stored ?? '{}');
       if (!verifier || state !== expectedState) {
         throw new UnauthorizedException('Invalid login state');
       }
@@ -52,7 +67,11 @@ export class AuthService {
         profile.email,
         profile.name,
       );
-      await this.sessionService.completeLogin(user.id, response);
+      await this.sessionService.completeLogin(
+        user,
+        rememberMe === true,
+        response,
+      );
       response.redirect(this.appConfig.frontendUrl);
     } catch (error) {
       this.logger.warn(`Entra login failed: ${(error as Error).message}`);
@@ -62,11 +81,14 @@ export class AuthService {
     }
   }
 
-  refresh(userId: string, response: Response) {
-    return this.sessionService.completeLogin(userId, response);
+  refresh(user: User, rememberMe: boolean, response: Response) {
+    return this.sessionService.completeLogin(user, rememberMe, response);
   }
 
-  logout(userId: string, response: Response) {
-    return this.sessionService.endSession(userId, response);
+  async logout(userId: string, response: Response) {
+    await this.userService.updateHashedRefreshToken(userId, null);
+    response.clearCookie(ACCESS_COOKIE, { path: '/' });
+    response.clearCookie(REFRESH_COOKIE, { path: REFRESH_COOKIE_PATH });
+    return { message: 'Logged out successfully' };
   }
 }

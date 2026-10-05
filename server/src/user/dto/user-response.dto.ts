@@ -8,6 +8,7 @@ export const UserResponseSchema = z.object({
   name: z.string(),
   role: z.enum(Role),
   createdAt: z.date(),
+  updatedAt: z.date(),
 });
 
 export class UserResponseDto extends createZodDto(UserResponseSchema) {}

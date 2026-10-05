@@ -6,6 +6,7 @@ export type JwtPayload = {
     email: string;
     name: string;
     role: string;
+    rememberMe: boolean;
   };
   iat?: number;
   exp?: number;
@@ -13,6 +14,8 @@ export type JwtPayload = {
 
 declare global {
   namespace Express {
-    interface User extends PrismaUser {}
+    interface User extends PrismaUser {
+      rememberMe: boolean;
+    }
   }
 }
