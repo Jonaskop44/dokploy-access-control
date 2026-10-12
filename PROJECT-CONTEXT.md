@@ -1,6 +1,6 @@
 # HTL-Dock: Projektkontext
 
-Stand: 2026-10-07. Dieses Dokument hält fest, was im Gespräch über das Projekt geklärt wurde. Grundlage ist der Projektauftrag (Projektbeginn 28.09.2026, Auftraggeber HTL Villach). Meilensteine aus dem Auftrag sind für die Planung nicht maßgeblich.
+Stand: 2026-10-12. Dieses Dokument hält fest, was im Gespräch über das Projekt geklärt wurde. Grundlage ist der Projektauftrag (Projektbeginn 28.09.2026, Auftraggeber HTL Villach). Meilensteine aus dem Auftrag sind für die Planung nicht maßgeblich.
 
 ## Zielbild
 
@@ -23,8 +23,11 @@ HTL-Dock ist die **Cloud-Variante von Docker Desktop** für die HTL Villach. Ein
 Vorhanden:
 - Entra-ID-Login (backend-getrieben, PKCE, eigene JWT-Cookies), `User` mit `TEACHER`/`STUDENT`, `JwtAuthGuard`.
 - Dashboard-Grundgerüst im Frontend (Sidebar, Header, Übersicht), orval-generierter API-Client.
+- Dokploy-Anbindung im Backend: `DOKPLOY_URL`/`DOKPLOY_API_KEY` in `env.validation.ts`, orval-generierter Client in `server/src/config/dokploy/generated` (Tags `project`, `environment`, `compose`, `deployment`, `docker`), Mutator `dokploy-instance.ts`, `DokployModule` setzt URL und Key beim Start. Neu generieren mit `npm run dokploy:generate` (lädt die Spec mit dem Key aus `.env`). Die Antworten sind ungetypt (`{ [key: string]: unknown }`), weil Dokploys Spec sie nicht beschreibt; genutzte Felder werden bei Bedarf mit zod geprüft.
 
-Noch **nicht** vorhanden: Dokploy-Anbindung, Projekte, Git/Deployments, Limits, `RolesGuard`, Lehrer-Dashboard, Logs/Monitoring, Tests.
+- Datenmodell (Prisma): `User.className` (wird erst ab Etappe 3 befüllt), `Project` mit `dokployProjectId`/`composeId`/`appName`, `ProjectMember` (`OWNER`/`MEMBER`), `ProjectPort`, `Limit`. Umgebungsvariablen und Status liegen nur in Dokploy. Beim `Limit` ergibt sich die Ebene aus dem gesetzten Feld (`userId` = Schüler, `className` = Klasse, keines = global), `null` heißt erben. Die globale Zeile (`id = 'global'`, 3 Projekte, 1 laufend, 0,5 CPU, 512 MB) legt die Migration an, ein CHECK verbietet `className` und `userId` gleichzeitig.
+
+Noch **nicht** vorhanden: Projekt-Endpunkte, Git/Deployments, Limits, `RolesGuard`, Lehrer-Dashboard, Logs/Monitoring, Tests.
 
 ## Rollen
 
@@ -51,14 +54,30 @@ Noch **nicht** vorhanden: Dokploy-Anbindung, Projekte, Git/Deployments, Limits, 
 - Alles, was der Schüler in seiner Compose per `ports:` veröffentlicht, ist im Schulnetz erreichbar, auch die Datenbank. Es verhält sich wie Docker Desktop.
 - Das Backend **schreibt nur die Host-Seite um**: aus `"3000:3000"` wird z. B. `"20017:3000"`. Der Host-Port wird automatisch aus einem freien Bereich vergeben (Vorschlag `20000–29999`, änderbar). Die Firewall der VM muss ihn im Schulnetz freigeben.
 - Services ohne `ports:` bleiben nur untereinander erreichbar.
+- **`ProjectPort` ist die Quelle der Host-Ports**, keine Kopie: Host-Ports entstehen nur in unserer Override-Datei, und die wird aus dieser Tabelle erzeugt. Abgleich bei jedem Deploy in einer Transaktion:
+  - Gleicher Service mit gleichem Container-Port und Protokoll behält seinen Host-Port, die Adresse bleibt über Redeploys stabil.
+  - Neue `ports:`-Einträge bekommen einen freien Port aus dem Bereich.
+  - Nicht mehr vorhandene Einträge werden gelöscht, der Port wird frei.
+  - `hostPort` ist global unique, das verhindert Doppelvergabe auch bei gleichzeitigen Deploys.
+  - Beim Löschen eines Projekts verschwinden die Ports per Cascade.
 - Das UI zeigt pro Projekt eine Tabelle: Service, Container-Port, `VM-IP:Host-Port`.
 
 ## Compose-Prüfer (Sicherheit)
 
 Vor dem Deploy wird die Compose-Datei geprüft und angepasst:
-- **Ablehnen** bei `privileged`, `network_mode: host`, `/var/run/docker.sock` und Host-Pfaden als Volume. Sonst kann ein Schüler die VM übernehmen.
+- **Ablehnen** bei `privileged`, `network_mode: host`, `/var/run/docker.sock` und absoluten Host-Pfaden als Volume. Sonst kann ein Schüler die VM übernehmen.
+- **Relative Bind-Mounts innerhalb des Repos erlauben** (z. B. `./nginx/nginx.conf`, `../src`), solange sie nicht aus dem geklonten Repo herausführen. Typische Schülerprojekte nutzen sie, ein pauschales Verbot würde sie blockieren.
 - Host-Ports umschreiben (siehe oben).
 - CPU/RAM-Limits **pro Service/Container** einsetzen.
+- Anonyme Volumes (vom Image per `VOLUME` angelegt) als benannte Volumes setzen, damit das Löschen sie mit entfernt (siehe Dokploy-Erkenntnisse).
+
+**Umsetzung (im Spike verifiziert):** Die Git-Quelle bleibt erhalten, denn mit `raw` fehlt das Repo und `build:` sowie relative Bind-Mounts zeigen ins Leere. Stattdessen:
+1. Compose aus dem Repo lesen: `compose.loadServices` mit `type: 'fetch'` klont, danach liefert `compose.getConvertedCompose` die Datei.
+2. Prüfen und eine Override-Datei erzeugen (`ports: !override` für die Host-Ports, `deploy.resources.limits` für CPU/RAM).
+3. Override per `mounts.create` (`type: 'file'`, `serviceType: 'compose'`) ablegen; sie landet unter `/etc/dokploy/compose/<appName>/files/`.
+4. Eigenen `command` setzen, der den Override per `-f` dazunimmt, z. B. `compose -p <appName> --env-file <dir>/.env -f ./<composePath> -f /etc/dokploy/compose/<appName>/files/<override> up -d --build --remove-orphans`.
+   - Ohne führendes `docker`, Dokploy setzt es selbst davor.
+   - Ohne `--project-directory`, sonst werden relative Build-Pfade falsch aufgelöst.
 
 ## Limits
 
@@ -73,16 +92,28 @@ Auflösung: **Schüler überschreibt Klasse, Klasse überschreibt global.** Lehr
 
 Verhalten bei Erreichen: Nur **Erstellen und Starten** werden blockiert. Laufende Projekte bleiben an. Der Schüler bekommt die Meldung, sich an den Lehrer zu wenden. Weitere Limits (z. B. Mitglieder pro Gruppe) sind nicht nötig.
 
-**Vorgemerktes Speicher-Limit:** Nahe am Limit darf nichts Neues erstellt werden, über dem Limit ebenso nicht. Die Messung der Volume-Größen ist nicht über die Dokploy-API sicher möglich und bräuchte z. B. einen Hilfsdienst in der VM.
+**Vorgemerktes Speicher-Limit:** Nahe am Limit darf nichts Neues erstellt werden, über dem Limit ebenso nicht. Die Messung geht über die Dokploy-API: `dockerVolume.getVolumesSize` liefert Name und Größe als String (z. B. `"40.01MB"`), die Zuordnung zum Projekt läuft über das Namenspräfix `<appName>_`. Ein Hilfsdienst in der VM ist nicht nötig.
 
 ## Monitoring und Logs
 
 Logs, Status und Metriken von Dokploy werden **einfach durchgereicht**. Ob live (WebSocket) oder per Neuladen, ist noch nicht entschieden.
 
+## Dokploy-Erkenntnisse (Spike, Dokploy v0.30.8)
+
+- **Abbildung:** ein Dokploy-Projekt pro HTL-Projekt. `project.create` liefert `{ project, environment }` (Standard-Environment `production`), das Compose hängt am Environment. In der DB speichern: `dokployProjectId`, `composeId`, `appName`.
+- **Öffentliche GitLab-Repos** brauchen keinen Git-Provider: `sourceType: 'git'`, `customGitUrl`, `customGitBranch`, `composePath`.
+- **Neue Composes** haben `autoDeploy: true` und ein `refreshToken` (Webhook-URL). Beim Anlegen `autoDeploy` abschalten, da nur per Klick deployt wird.
+- **`composeStatus` beschreibt das Deployment, nicht die Container:** `running` = Deploy läuft, `done` = Deploy fertig bzw. gestartet, `idle` = gestoppt, `error` = Deploy fehlgeschlagen. Ob ein Container abgestürzt ist, zeigt nur der Container-State aus `docker.getContainersByAppNameMatch` (`running`/`exited`).
+- **Logs:** `compose.readLogs` braucht eine `containerId` und liefert Text mit Zeitstempeln. Container heißen `<appName>-<service>-<n>`, darüber läuft die Zuordnung zum Service.
+- **Fehlgeschlagene Deploys:** `errorMessage` bleibt `null`, der Grund (z. B. `port is already allocated`) steht nur in `deployment.readLogs`.
+- **Ports:** Ohne Umschreiben scheitert der Deploy bei belegten Ports (80/443 belegt Traefik von Dokploy). Veröffentlichte Ports waren vom Entwicklungsrechner aus erreichbar (HTTP und Postgres).
+- **Löschen:** `compose.delete` mit `deleteVolumes: true` entfernt Container und benannte Volumes, danach `project.remove`. **Anonyme Volumes bleiben liegen** und tragen kein Compose-Label, deshalb im Override benennen (siehe Compose-Prüfer).
+- **Firewall (nicht geprüft):** Von Docker veröffentlichte Ports umgehen `ufw` in der Regel. Die Freigabe nur fürs Schulnetz muss über die `DOCKER-USER`-Chain oder die Netzwerkseite laufen.
+
 ## Plan (jede Etappe endet lauffähig)
 
-1. **Dokploy-Spike:** `DOKPLOY_URL` und `DOKPLOY_API_KEY` in `.env`/`env.validation.ts`, ein `DokployService`. Manuell testen: Compose aus öffentlichem GitLab-Repo anlegen, deployen, stoppen, löschen. Klären, ob Compose-Umschreiben (Ports, Limits) über Dokploy geht oder wir die Datei selbst holen und "raw" übergeben müssen. Außerdem Logs/Metriken und die Port-Bereichsgröße prüfen.
-2. **Datenmodell:** `User.className`, `Project`, `ProjectMember`, `Limit`; Migration.
+1. ~~**Dokploy-Spike:**~~ **Erledigt** (Ergebnisse siehe Dokploy-Erkenntnisse und Compose-Prüfer). `DOKPLOY_URL` und `DOKPLOY_API_KEY` in `.env`/`env.validation.ts`, ein `DokployService`. Manuell testen: Compose aus öffentlichem GitLab-Repo anlegen, deployen, stoppen, löschen. Klären, ob Compose-Umschreiben (Ports, Limits) über Dokploy geht oder wir die Datei selbst holen und "raw" übergeben müssen. Außerdem Logs/Metriken und die Port-Bereichsgröße prüfen.
+2. ~~**Datenmodell:**~~ **Erledigt** (Migration `add_projects_and_limits`). `User.className`, `Project`, `ProjectMember`, `ProjectPort`, `Limit`; Migration.
 3. **Rollen:** austauschbare Namensregel, `RolesGuard`, `@Roles()`.
 4. **Projekt-CRUD** mit Mitglieder-Checks.
 5. **Deployment:** Repo-URL, Branch, Compose-Pfad, Compose-Prüfer, automatische Port-Vergabe.
@@ -97,8 +128,8 @@ Logs, Status und Metriken von Dokploy werden **einfach durchgereicht**. Ob live 
 ## Offene Punkte
 
 - Endgültige Lehrererkennung (Montag, Rücksprache mit dem Lehrer).
-- Speicher-Limit und Messung der Volume-Größen.
+- Speicher-Limit (Messung geht per API, Umsetzung noch offen).
+- Firewall-Regeln der VM für den Port-Bereich (nur Schulnetz, `DOCKER-USER`-Chain).
 - Logs live oder per Neuladen.
-- Dokploy-URL und API-Key der VM eintragen (nicht im Chat teilen, nur in `server/.env`).
 - Domain-/Subdomain-Variante (`projektname.htl-dock.htl-villach.at`) bleibt optional für später.
 - Skalierung (Anzahl Schüler, Serverausstattung) ist bewusst noch nicht relevant.

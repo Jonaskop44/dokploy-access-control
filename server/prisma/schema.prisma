@@ -12,13 +12,73 @@ enum Role {
   STUDENT
 }
 
+enum ProjectRole {
+  OWNER
+  MEMBER
+}
+
 model User {
-  id                 String   @id @default(uuid())
-  entraOid           String   @unique
-  email              String   @unique
+  id                 String          @id @default(uuid())
+  entraOid           String          @unique
+  email              String          @unique
   name               String
-  role               Role     @default(STUDENT)
+  role               Role            @default(STUDENT)
+  className          String?
   hashedRefreshToken String?
-  createdAt          DateTime @default(now())
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  memberships        ProjectMember[]
+  limit              Limit?
+}
+
+model Project {
+  id               String          @id @default(uuid())
+  name             String
+  description      String?
+  gitUrl           String
+  branch           String
+  composePath      String          @default("./docker-compose.yml")
+  dokployProjectId String          @unique
+  composeId        String          @unique
+  appName          String          @unique
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  members          ProjectMember[]
+  ports            ProjectPort[]
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  role      ProjectRole
+  createdAt DateTime    @default(now())
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
+}
+
+model ProjectPort {
+  id            String  @id @default(uuid())
+  projectId     String
+  serviceName   String
+  containerPort Int
+  protocol      String  @default("tcp")
+  hostPort      Int     @unique
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, serviceName, containerPort, protocol])
+}
+
+model Limit {
+  id                 String   @id @default(uuid())
+  className          String?  @unique
+  userId             String?  @unique
+  maxProjects        Int?
+  maxRunningProjects Int?
+  cpuLimit           Float?
+  memoryMb           Int?
   updatedAt          DateTime @updatedAt
+  user               User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
