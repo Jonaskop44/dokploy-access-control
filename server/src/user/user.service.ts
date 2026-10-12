@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../config/prisma/prisma.service.js';
+import { classifyUser } from './classify-user.js';
 
 @Injectable()
 export class UserService {
@@ -16,10 +17,11 @@ export class UserService {
   }
 
   upsertFromEntra(entraOid: string, email: string, name: string) {
+    const { role, className } = classifyUser(name);
     return this.prisma.user.upsert({
       where: { entraOid },
-      create: { entraOid, email, name },
-      update: { email, name },
+      create: { entraOid, email, name, role, className },
+      update: { email, name, role, className },
     });
   }
 
