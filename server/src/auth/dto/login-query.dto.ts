@@ -1,10 +1,13 @@
-import { createZodDto } from 'nestjs-zod';
-import { z } from 'zod';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsOptional } from 'class-validator';
 
-export const LoginQuerySchema = z
-  .object({
-    rememberMe: z.stringbool().optional().default(false),
-  })
-  .strict();
-
-export class LoginQueryDto extends createZodDto(LoginQuerySchema) {}
+export class LoginQueryDto {
+  @ApiPropertyOptional({ type: Boolean, default: false })
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  rememberMe = false;
+}

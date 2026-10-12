@@ -1,9 +1,14 @@
-import { createZodDto } from 'nestjs-zod';
-import { z } from 'zod';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsString } from 'class-validator';
 
-export const CallbackQuerySchema = z.object({
-  code: z.string().min(1),
-  state: z.string().min(1),
-});
+export class CallbackQueryDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  code: string;
 
-export class CallbackQueryDto extends createZodDto(CallbackQuerySchema) {}
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  state: string;
+}
