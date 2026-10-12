@@ -8,6 +8,7 @@ import { EnvSchema } from './config/env.validation.js';
 import { AppConfigModule } from './config/app-config/app-config.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { PrismaModule } from './config/prisma/prisma.module.js';
+import { DokployModule } from './config/dokploy/dokploy.module.js';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PrismaModule } from './config/prisma/prisma.module.js';
     AppConfigModule,
     UserModule,
     PrismaModule,
+    DokployModule,
     AuthModule,
   ],
   controllers: [],

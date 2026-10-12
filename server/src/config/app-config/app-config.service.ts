@@ -65,6 +65,15 @@ export class AppConfigService {
     return this.configService.getOrThrow('ENTRA_REDIRECT_URI');
   }
 
+  //Dokploy Configuration
+  get dokployUrl(): string {
+    return this.configService.getOrThrow('DOKPLOY_URL');
+  }
+
+  get dokployApiKey(): string {
+    return this.configService.getOrThrow('DOKPLOY_API_KEY');
+  }
+
   //CORS Configuration
   get frontendUrl(): string {
     return this.configService.getOrThrow('FRONTEND_URL');

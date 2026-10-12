@@ -23,6 +23,10 @@ export const EnvSchema = z.object({
   ENTRA_CLIENT_SECRET: z.string().min(1),
   ENTRA_REDIRECT_URI: z.url(),
 
+  //Dokploy Configuration
+  DOKPLOY_URL: z.url(),
+  DOKPLOY_API_KEY: z.string().min(1),
+
   //CORS Configuration
   FRONTEND_URL: z.url(),
   DOMAIN: z.string().min(1),
