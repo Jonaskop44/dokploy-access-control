@@ -29,7 +29,7 @@ Vorhanden:
 
 - Datenmodell (Prisma): `User.className` (wird beim Login aus dem Namen gesetzt), `Project` mit `dokployProjectId`/`composeId`/`appName`, `ProjectMember` (`OWNER`/`MEMBER`), `ProjectPort`, `Limit`. Umgebungsvariablen und Status liegen nur in Dokploy. Beim `Limit` ergibt sich die Ebene aus dem gesetzten Feld (`userId` = Schüler, `className` = Klasse, keines = global), `null` heißt erben. Die globale Zeile (`id = 'global'`, 3 Projekte, 1 laufend, 0,5 CPU, 512 MB) legt die Migration an, ein CHECK verbietet `className` und `userId` gleichzeitig.
 
-Noch **nicht** vorhanden: Projekt-Endpunkte, Git/Deployments, Limits, Lehrer-Dashboard, Logs/Monitoring, Tests. Der `RolesGuard` wird noch von keinem Endpunkt genutzt.
+Noch **nicht** vorhanden: Deployments (Compose-Prüfer, Port-Vergabe, Start/Stopp), Limits, Lehrer-Dashboard, Logs/Monitoring, Tests. Der `RolesGuard` wird noch von keinem Endpunkt genutzt.
 
 ## Rollen
 
@@ -118,7 +118,7 @@ Logs, Status und Metriken von Dokploy werden **einfach durchgereicht**. Ob live 
 1. ~~**Dokploy-Spike:**~~ **Erledigt** (Ergebnisse siehe Dokploy-Erkenntnisse und Compose-Prüfer). `DOKPLOY_URL` und `DOKPLOY_API_KEY` in `.env`/`env.validation.ts`, ein `DokployService`. Manuell testen: Compose aus öffentlichem GitLab-Repo anlegen, deployen, stoppen, löschen. Klären, ob Compose-Umschreiben (Ports, Limits) über Dokploy geht oder wir die Datei selbst holen und "raw" übergeben müssen. Außerdem Logs/Metriken und die Port-Bereichsgröße prüfen.
 2. ~~**Datenmodell:**~~ **Erledigt** (Migration `add_projects_and_limits`). `User.className`, `Project`, `ProjectMember`, `ProjectPort`, `Limit`; Migration.
 3. ~~**Rollen:**~~ **Erledigt.** Austauschbare Namensregel, `RolesGuard`, `@Roles()`. Dabei Umstellung von zod auf class-validator/class-transformer.
-4. **Projekt-CRUD** mit Mitglieder-Checks.
+4. ~~**Projekt-CRUD**~~ **Umgesetzt** (`server/src/project/`, noch nicht gegen die laufende Dokploy-Instanz getestet). `POST/GET/PATCH/DELETE /projects`: Anlegen erzeugt Dokploy-Projekt + Compose (Git-Quelle, `autoDeploy` aus), speichert die IDs und macht den Ersteller zum `OWNER`. Ansehen: Mitglieder und Lehrer (Nicht-Mitglieder bekommen 404). Bearbeiten/Löschen: `OWNER` und Lehrer. Löschen entfernt zuerst Dokploy (inkl. Volumes), dann die DB. Mitglieder hinzufügen/entfernen kommt erst in Etappe 11.
 5. **Deployment:** Repo-URL, Branch, Compose-Pfad, Compose-Prüfer, automatische Port-Vergabe.
 6. **Start, Stopp, Status.**
 7. **Limits** mit Prüfung vor Erstellen und Starten.

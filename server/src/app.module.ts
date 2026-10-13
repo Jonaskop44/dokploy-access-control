@@ -12,6 +12,7 @@ import { AppConfigModule } from './config/app-config/app-config.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { PrismaModule } from './config/prisma/prisma.module.js';
 import { DokployModule } from './config/dokploy/dokploy.module.js';
+import { ProjectModule } from './project/project.module.js';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { DokployModule } from './config/dokploy/dokploy.module.js';
     PrismaModule,
     DokployModule,
     AuthModule,
+    ProjectModule,
   ],
   controllers: [],
   providers: [
