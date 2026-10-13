@@ -7,5 +7,5 @@
  */
 
 export type AuthControllerLoginParams = {
-  rememberMe?: string;
+  rememberMe?: boolean;
 };
