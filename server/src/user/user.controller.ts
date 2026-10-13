@@ -1,5 +1,5 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
-import { ZodSerializerDto } from 'nestjs-zod';
+import { Controller, Get, SerializeOptions, UseGuards } from '@nestjs/common';
+import { ApiOkResponse } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard.js';
 import { UserResponseDto } from './dto/user-response.dto.js';
@@ -11,7 +11,8 @@ export class UserController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  @ZodSerializerDto(UserResponseDto)
+  @SerializeOptions({ type: UserResponseDto, excludeExtraneousValues: true })
+  @ApiOkResponse({ type: UserResponseDto })
   me(@CurrentUser('id') userId: string) {
     return this.userService.findById(userId);
   }

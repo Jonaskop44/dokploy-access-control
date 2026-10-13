@@ -2,15 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-NestJS backend for the Dokploy access-control UI (`../web` is a separate Next.js project, no shared code). Reply to the user in German; code, comments, commits and names stay English. Full conventions: [NEW-PROJECT-BRIEFING.md](NEW-PROJECT-BRIEFING.md). That briefing describes a reference project: its mail, password/local login, 2FA and verification-token sections do **not** exist here (auth is Entra-only, see below).
+NestJS backend for the Dokploy access-control UI (`../web` is a separate Next.js project, no shared code). Reply to the user in German; code, comments, commits and names stay English. Full conventions: [NEW-PROJECT-BRIEFING.md](NEW-PROJECT-BRIEFING.md). That briefing describes a reference project: its mail, password/local login, 2FA and verification-token sections do **not** exist here (auth is Entra-only, see below), and its zod/nestjs-zod sections are superseded: this project uses `class-validator` / `class-transformer` (rules below win).
 
 ## Rules
 
-- Install packages with `npm install <pkg> --legacy-peer-deps` (`nestjs-zod` does not declare Nest 12 peer support).
+- Install packages with plain `npm install <pkg>`; `--legacy-peer-deps` was only needed for the removed `nestjs-zod`.
 - ESM: every relative import needs the `.js` extension; use `import type` for type-only imports. Prisma types/enums come from `config/prisma/generated/client.js` / `enums.js`.
 - No `process.env` in code, use `AppConfigService` (only exception: `PrismaService`). New env vars go into `src/config/env.validation.ts` and `.env.example` under the same `//Section` heading.
-- DTOs are zod schema + `createZodDto` in one file; request DTOs are `.strict()`. Every handler returning data uses `@ZodSerializerDto(...)` with a non-strict response schema (this is what strips `hashedRefreshToken` etc.). No `class-validator`.
-- Decorator order on handlers: HTTP method, `@HttpCode`, `@Throttle`, `@UseGuards`, `@ZodSerializerDto`.
+- DTOs are classes with `class-validator` decorators plus `@ApiProperty` (no Swagger CLI plugin, so every field needs it or it is missing from `openapi.json` and the frontend types). Query values arrive as strings: booleans need an explicit `@Transform`, numbers are converted by `transform: true` only when the property has an explicit type. No zod.
+- Request DTOs: unknown properties are stripped by the global pipe, not rejected (Entra's callback sends extra query params).
+- Response DTOs mark every sent field with `@Expose()`. Handlers returning data use `@SerializeOptions({ type: XDto, excludeExtraneousValues: true })` plus `@ApiOkResponse({ type: XDto })`; the first is what strips `hashedRefreshToken` etc., the second documents the response (without it the frontend client types it as `void`). Nullable fields: `@ApiProperty({ type: String, nullable: true })`; dates: `@ApiProperty({ type: String, format: 'date-time' })` on a `Date` property.
+- Decorator order on handlers: HTTP method, `@HttpCode`, `@Throttle`, `@UseGuards`, `@SerializeOptions`, `@ApiOkResponse`.
 - Controllers stay thin; Prisma access only in services.
 - Domains (`user/`, ...) live at the top of `src/`; infrastructure lives in `src/config/<name>/`; guards in `src/guards/`.
 - No circular imports between providers and no `forwardRef()` (real ESM + `emitDecoratorMetadata` causes `Cannot access 'X' before initialization`); extract shared logic into a third service.
@@ -26,7 +28,8 @@ NestJS backend for the Dokploy access-control UI (`../web` is a separate Next.js
 ## App wiring
 
 - Global prefix `api/v1`; Swagger at `/api/v1/api-docs`. `trust proxy` is 1 (Traefik), required for per-IP throttling.
-- `app.module.ts` registers globally: `ZodValidationPipe`, `ZodSerializerInterceptor`, `ThrottlerGuard` (60 req/min default; auth routes override via `@Throttle`). `AppConfigModule` and `PrismaModule` are `@Global()`; `AppConfigModule` also registers/exports `PassportModule`, so feature modules never import it.
+- Env vars are validated at boot by `validateEnv` in `config/env.validation.ts` (class-validator class, `enableImplicitConversion`; give non-string fields an explicit type annotation or they stay strings).
+- `app.module.ts` registers globally: `ValidationPipe({ whitelist: true, transform: true })`, `ClassSerializerInterceptor`, `ThrottlerGuard` (60 req/min default; auth routes override via `@Throttle`). `AppConfigModule` and `PrismaModule` are `@Global()`; `AppConfigModule` also registers/exports `PassportModule`, so feature modules never import it.
 - `AuthModule` lists `UserService` directly in its providers rather than importing `UserModule`.
 
 ## Auth (Microsoft Entra ID)
@@ -36,4 +39,4 @@ NestJS backend for the Dokploy access-control UI (`../web` is a separate Next.js
 - Refresh token storage: raw JWT -> SHA-256 -> bcrypt -> `User.hashedRefreshToken`. Always go through `SessionService.hashRefreshTokenInput()`. Tokens rotate on every refresh; logout nulls the hash.
 - `rememberMe` lives in the JWT payload (`sub.rememberMe`) and selects refresh lifetime (`JWT_REFRESH_EXPIRES_IN` vs `JWT_REFRESH_SESSION_EXPIRES_IN`) and persistent vs session refresh cookie.
 - `JwtAccessStrategy.validate()` returns only `{ id }`, so on `JwtAuthGuard` routes `request.user` holds just the id despite the `Express.User` typing; load the user via `UserService` when more is needed.
-- Roles: `Role` enum is `TEACHER` / `STUDENT`, default `STUDENT`. A `@Roles()` decorator exists but no `RolesGuard` yet; teachers are promoted manually in the DB.
+- Roles: `Role` enum is `TEACHER` / `STUDENT`. Role and `className` are derived from the Entra display name by `user/classify-user.ts` on every login (provisional rule: `, <class>` suffix = student, else teacher), so manual DB edits are overwritten. Protect routes with `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(Role.TEACHER)`; `RolesGuard` reads the role from the DB, so the module must provide `UserService` (import `UserModule`).

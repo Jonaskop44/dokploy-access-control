@@ -1,14 +1,33 @@
-import { createZodDto } from 'nestjs-zod';
-import { z } from 'zod';
+import { ApiProperty } from '@nestjs/swagger';
+import { Expose } from 'class-transformer';
 import { Role } from '../../config/prisma/generated/enums.js';
 
-export const UserResponseSchema = z.object({
-  id: z.uuid(),
-  email: z.email(),
-  name: z.string(),
-  role: z.enum(Role),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-});
+export class UserResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  @Expose()
+  id: string;
 
-export class UserResponseDto extends createZodDto(UserResponseSchema) {}
+  @ApiProperty({ format: 'email' })
+  @Expose()
+  email: string;
+
+  @ApiProperty()
+  @Expose()
+  name: string;
+
+  @ApiProperty({ enum: Role })
+  @Expose()
+  role: Role;
+
+  @ApiProperty({ type: String, nullable: true })
+  @Expose()
+  className: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  @Expose()
+  createdAt: Date;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  @Expose()
+  updatedAt: Date;
+}

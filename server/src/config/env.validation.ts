@@ -1,35 +1,85 @@
-import { z } from 'zod';
+import { plainToInstance } from 'class-transformer';
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  IsUrl,
+  MinLength,
+  validateSync,
+} from 'class-validator';
 
-export const EnvSchema = z.object({
+// Local hosts and IPs (localhost, VM-IP) have no TLD.
+const URL_OPTIONS = { require_tld: false, require_protocol: true };
+
+class EnvironmentVariables {
   //Server Configuration
-  NODE_ENV: z
-    .enum(['development', 'production', 'test'])
-    .default('development'),
-  PORT: z.coerce.number().default(4000),
+  @IsIn(['development', 'production', 'test'])
+  NODE_ENV = 'development';
+
+  @IsInt()
+  PORT: number = 4000;
 
   //Database Configuration
-  DATABASE_URL: z.url(),
+  @IsUrl({ ...URL_OPTIONS, protocols: ['postgresql', 'postgres'] })
+  DATABASE_URL: string;
 
   //Auth Configuration
-  JWT_ACCESS_SECRET: z.string().min(32),
-  JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
-  JWT_REFRESH_SECRET: z.string().min(32),
-  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
-  JWT_REFRESH_SESSION_EXPIRES_IN: z.string().default('1d'),
+  @IsString()
+  @MinLength(32)
+  JWT_ACCESS_SECRET: string;
+
+  @IsString()
+  JWT_ACCESS_EXPIRES_IN: string = '15m';
+
+  @IsString()
+  @MinLength(32)
+  JWT_REFRESH_SECRET: string;
+
+  @IsString()
+  JWT_REFRESH_EXPIRES_IN: string = '7d';
+
+  @IsString()
+  JWT_REFRESH_SESSION_EXPIRES_IN: string = '1d';
 
   //Entra ID Configuration
-  ENTRA_TENANT_ID: z.string().min(1),
-  ENTRA_CLIENT_ID: z.string().min(1),
-  ENTRA_CLIENT_SECRET: z.string().min(1),
-  ENTRA_REDIRECT_URI: z.url(),
+  @IsString()
+  @IsNotEmpty()
+  ENTRA_TENANT_ID: string;
+
+  @IsString()
+  @IsNotEmpty()
+  ENTRA_CLIENT_ID: string;
+
+  @IsString()
+  @IsNotEmpty()
+  ENTRA_CLIENT_SECRET: string;
+
+  @IsUrl(URL_OPTIONS)
+  ENTRA_REDIRECT_URI: string;
 
   //Dokploy Configuration
-  DOKPLOY_URL: z.url(),
-  DOKPLOY_API_KEY: z.string().min(1),
+  @IsUrl(URL_OPTIONS)
+  DOKPLOY_URL: string;
+
+  @IsNotEmpty()
+  DOKPLOY_API_KEY: string;
 
   //CORS Configuration
-  FRONTEND_URL: z.url(),
-  DOMAIN: z.string().min(1),
-});
+  @IsUrl(URL_OPTIONS)
+  FRONTEND_URL: string;
 
-export type Env = z.infer<typeof EnvSchema>;
+  @IsNotEmpty()
+  DOMAIN: string;
+}
+
+export function validateEnv(config: object) {
+  const env = plainToInstance(EnvironmentVariables, config, {
+    enableImplicitConversion: true,
+  });
+  const errors = validateSync(env, { skipMissingProperties: false });
+  if (errors.length > 0) {
+    throw new Error(errors.toString());
+  }
+  return env;
+}

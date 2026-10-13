@@ -1,10 +1,13 @@
-import { Module } from '@nestjs/common';
+import {
+  ClassSerializerInterceptor,
+  Module,
+  ValidationPipe,
+} from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
-import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { UserModule } from './user/user.module.js';
 import { ConfigModule } from '@nestjs/config';
-import { EnvSchema } from './config/env.validation.js';
+import { validateEnv } from './config/env.validation.js';
 import { AppConfigModule } from './config/app-config/app-config.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { PrismaModule } from './config/prisma/prisma.module.js';
@@ -14,7 +17,7 @@ import { DokployModule } from './config/dokploy/dokploy.module.js';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validate: (config) => EnvSchema.parse(config),
+      validate: validateEnv,
     }),
     ThrottlerModule.forRoot([
       {
@@ -32,11 +35,11 @@ import { DokployModule } from './config/dokploy/dokploy.module.js';
   providers: [
     {
       provide: APP_PIPE,
-      useClass: ZodValidationPipe,
+      useValue: new ValidationPipe({ whitelist: true, transform: true }),
     },
     {
       provide: APP_INTERCEPTOR,
-      useClass: ZodSerializerInterceptor,
+      useClass: ClassSerializerInterceptor,
     },
     {
       provide: APP_GUARD,
