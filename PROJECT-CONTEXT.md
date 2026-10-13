@@ -1,6 +1,6 @@
 # HTL-Dock: Projektkontext
 
-Stand: 2026-10-12. Dieses Dokument hält fest, was im Gespräch über das Projekt geklärt wurde. Grundlage ist der Projektauftrag (Projektbeginn 28.09.2026, Auftraggeber HTL Villach). Meilensteine aus dem Auftrag sind für die Planung nicht maßgeblich.
+Stand: 2026-10-13. Dieses Dokument hält fest, was im Gespräch über das Projekt geklärt wurde. Grundlage ist der Projektauftrag (Projektbeginn 28.09.2026, Auftraggeber HTL Villach). Meilensteine aus dem Auftrag sind für die Planung nicht maßgeblich.
 
 ## Zielbild
 
@@ -23,18 +23,21 @@ HTL-Dock ist die **Cloud-Variante von Docker Desktop** für die HTL Villach. Ein
 Vorhanden:
 - Entra-ID-Login (backend-getrieben, PKCE, eigene JWT-Cookies), `User` mit `TEACHER`/`STUDENT`, `JwtAuthGuard`.
 - Dashboard-Grundgerüst im Frontend (Sidebar, Header, Übersicht), orval-generierter API-Client.
-- Dokploy-Anbindung im Backend: `DOKPLOY_URL`/`DOKPLOY_API_KEY` in `env.validation.ts`, orval-generierter Client in `server/src/config/dokploy/generated` (Tags `project`, `environment`, `compose`, `deployment`, `docker`), Mutator `dokploy-instance.ts`, `DokployModule` setzt URL und Key beim Start. Neu generieren mit `npm run dokploy:generate` (lädt die Spec mit dem Key aus `.env`). Die Antworten sind ungetypt (`{ [key: string]: unknown }`), weil Dokploys Spec sie nicht beschreibt; genutzte Felder werden bei Bedarf mit zod geprüft.
+- Dokploy-Anbindung im Backend: `DOKPLOY_URL`/`DOKPLOY_API_KEY` in `env.validation.ts`, orval-generierter Client in `server/src/config/dokploy/generated` (Tags `project`, `environment`, `compose`, `deployment`, `docker`), Mutator `dokploy-instance.ts`, `DokployModule` setzt URL und Key beim Start. Neu generieren mit `npm run dokploy:generate` (lädt die Spec mit dem Key aus `.env`). Die Antworten sind ungetypt (`{ [key: string]: unknown }`), weil Dokploys Spec sie nicht beschreibt; genutzte Felder werden bei Bedarf mit class-validator geprüft.
+- Validierung und Serialisierung mit `class-validator`/`class-transformer` (zod und nestjs-zod wurden entfernt, weil nestjs-zod 5 `@nestjs/swagger` 12 nicht unterstützt). Global in `app.module.ts`: `ValidationPipe({ whitelist: true, transform: true })` (unbekannte Felder werden entfernt, nicht abgelehnt, da Entras Callback z. B. `session_state` mitschickt) und `ClassSerializerInterceptor`. Response-DTOs geben nur `@Expose()`-Felder heraus (`@SerializeOptions({ type, excludeExtraneousValues: true })` am Handler), jedes Feld braucht `@ApiProperty`, sonst fehlt es im `openapi.json` und in den Frontend-Typen. Env-Validierung über `validateEnv` in `env.validation.ts`. Details in `server/CLAUDE.md`.
+- Rollen: Namensregel in `server/src/user/classify-user.ts` setzt `role` und `className` bei jedem Login neu, `RolesGuard` (liest die Rolle aus der DB) mit `@Roles()`.
 
-- Datenmodell (Prisma): `User.className` (wird erst ab Etappe 3 befüllt), `Project` mit `dokployProjectId`/`composeId`/`appName`, `ProjectMember` (`OWNER`/`MEMBER`), `ProjectPort`, `Limit`. Umgebungsvariablen und Status liegen nur in Dokploy. Beim `Limit` ergibt sich die Ebene aus dem gesetzten Feld (`userId` = Schüler, `className` = Klasse, keines = global), `null` heißt erben. Die globale Zeile (`id = 'global'`, 3 Projekte, 1 laufend, 0,5 CPU, 512 MB) legt die Migration an, ein CHECK verbietet `className` und `userId` gleichzeitig.
+- Datenmodell (Prisma): `User.className` (wird beim Login aus dem Namen gesetzt), `Project` mit `dokployProjectId`/`composeId`/`appName`, `ProjectMember` (`OWNER`/`MEMBER`), `ProjectPort`, `Limit`. Umgebungsvariablen und Status liegen nur in Dokploy. Beim `Limit` ergibt sich die Ebene aus dem gesetzten Feld (`userId` = Schüler, `className` = Klasse, keines = global), `null` heißt erben. Die globale Zeile (`id = 'global'`, 3 Projekte, 1 laufend, 0,5 CPU, 512 MB) legt die Migration an, ein CHECK verbietet `className` und `userId` gleichzeitig.
 
-Noch **nicht** vorhanden: Projekt-Endpunkte, Git/Deployments, Limits, `RolesGuard`, Lehrer-Dashboard, Logs/Monitoring, Tests.
+Noch **nicht** vorhanden: Projekt-Endpunkte, Git/Deployments, Limits, Lehrer-Dashboard, Logs/Monitoring, Tests. Der `RolesGuard` wird noch von keinem Endpunkt genutzt.
 
 ## Rollen
 
 - Nur `TEACHER` und `STUDENT`. Eine Admin-Rolle gibt es nicht (im Auftrag erwähnt, wird gestrichen).
-- **Lehrererkennung (vorläufig):** Ein Name mit Suffix `, <Klasse>` ist ein Schüler, z. B. `KROPIUNIG Jonas Leon, 5AHITN`. Alles andere ist ein Lehrer. Die Regel (ca. `,\s*\d[A-Z]+$`) kommt in **eine austauschbare Funktion**.
-- **Offen:** Die endgültige Methode klärt Jonas am Montag mit seinem Lehrer. Alternativen waren Entra-Gruppen-Claim, Entra-Attribute oder eine Allowlist.
-- Die Klasse wird beim Login aus dem Namen gelesen und als Feld am `User` gespeichert. Sie aktualisiert sich bei jedem Login (Klassenwechsel).
+- **Lehrererkennung (vorläufig):** Ein Name mit Suffix `, <Klasse>` ist ein Schüler, z. B. `KROPIUNIG Jonas Leon, 5AHITN`. Alles andere ist ein Lehrer. Umgesetzt in der austauschbaren Funktion `classifyUser` (`server/src/user/classify-user.ts`, Regex `,\s*(\d[A-Z]+)\s*$`).
+- **Offen:** Die endgültige Methode klärt Jonas mit seinem Lehrer. Alternativen waren Entra-Gruppen-Claim, Entra-Attribute oder eine Allowlist. Eine Änderung betrifft nur `classifyUser`.
+- Rolle und Klasse werden bei **jedem** Login neu bestimmt (Klassenwechsel greift automatisch). Manuelle Änderungen der Rolle in der DB werden dabei überschrieben.
+- Geschützte Routen: `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(Role.TEACHER)`. Der Guard liest die Rolle aus der DB, nicht aus dem JWT, damit ein Rollenwechsel sofort wirkt.
 - Lehrer dürfen **alle Projekte aller Schüler ansehen, bearbeiten und löschen**.
 
 ## Projekte
@@ -114,7 +117,7 @@ Logs, Status und Metriken von Dokploy werden **einfach durchgereicht**. Ob live 
 
 1. ~~**Dokploy-Spike:**~~ **Erledigt** (Ergebnisse siehe Dokploy-Erkenntnisse und Compose-Prüfer). `DOKPLOY_URL` und `DOKPLOY_API_KEY` in `.env`/`env.validation.ts`, ein `DokployService`. Manuell testen: Compose aus öffentlichem GitLab-Repo anlegen, deployen, stoppen, löschen. Klären, ob Compose-Umschreiben (Ports, Limits) über Dokploy geht oder wir die Datei selbst holen und "raw" übergeben müssen. Außerdem Logs/Metriken und die Port-Bereichsgröße prüfen.
 2. ~~**Datenmodell:**~~ **Erledigt** (Migration `add_projects_and_limits`). `User.className`, `Project`, `ProjectMember`, `ProjectPort`, `Limit`; Migration.
-3. **Rollen:** austauschbare Namensregel, `RolesGuard`, `@Roles()`.
+3. ~~**Rollen:**~~ **Erledigt.** Austauschbare Namensregel, `RolesGuard`, `@Roles()`. Dabei Umstellung von zod auf class-validator/class-transformer.
 4. **Projekt-CRUD** mit Mitglieder-Checks.
 5. **Deployment:** Repo-URL, Branch, Compose-Pfad, Compose-Prüfer, automatische Port-Vergabe.
 6. **Start, Stopp, Status.**
@@ -127,7 +130,7 @@ Logs, Status und Metriken von Dokploy werden **einfach durchgereicht**. Ob live 
 
 ## Offene Punkte
 
-- Endgültige Lehrererkennung (Montag, Rücksprache mit dem Lehrer).
+- Endgültige Lehrererkennung (Rücksprache mit dem Lehrer), betrifft nur `classifyUser`.
 - Speicher-Limit (Messung geht per API, Umsetzung noch offen).
 - Firewall-Regeln der VM für den Port-Bereich (nur Schulnetz, `DOCKER-USER`-Chain).
 - Logs live oder per Neuladen.
