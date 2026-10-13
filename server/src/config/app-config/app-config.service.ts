@@ -74,6 +74,13 @@ export class AppConfigService {
     return this.configService.getOrThrow('DOKPLOY_API_KEY');
   }
 
+  get projectPortRange(): { start: number; end: number } {
+    return {
+      start: this.configService.getOrThrow('PROJECT_PORT_RANGE_START'),
+      end: this.configService.getOrThrow('PROJECT_PORT_RANGE_END'),
+    };
+  }
+
   //CORS Configuration
   get frontendUrl(): string {
     return this.configService.getOrThrow('FRONTEND_URL');

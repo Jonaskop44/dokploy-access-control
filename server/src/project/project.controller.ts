@@ -13,12 +13,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiOkResponse,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard.js';
+import { DeployResponseDto } from './dto/deploy-response.dto.js';
 import { CreateProjectDto } from './dto/create-project.dto.js';
 import { ProjectResponseDto } from './dto/project-response.dto.js';
 import { UpdateProjectDto } from './dto/update-project.dto.js';
@@ -62,6 +64,17 @@ export class ProjectController {
     @Body() dto: UpdateProjectDto,
   ) {
     return this.projectService.update(userId, id, dto);
+  }
+
+  @Post(':id/deploy')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @SerializeOptions({ type: DeployResponseDto, excludeExtraneousValues: true })
+  @ApiAcceptedResponse({ type: DeployResponseDto })
+  deploy(
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.projectService.deploy(userId, id);
   }
 
   @Delete(':id')

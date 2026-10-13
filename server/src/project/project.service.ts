@@ -9,7 +9,10 @@ import { ProjectRole, Role } from '../config/prisma/generated/enums.js';
 import { UserService } from '../user/user.service.js';
 import type { CreateProjectDto } from './dto/create-project.dto.js';
 import type { UpdateProjectDto } from './dto/update-project.dto.js';
+import { analyzeCompose } from './compose/analyze-compose.js';
+import { buildOverride, OVERRIDE_FILE_NAME } from './compose/build-override.js';
 import { DokployProjectService } from './dokploy-project.service.js';
+import { ProjectPortService } from './project-port.service.js';
 
 const withMembers = {
   members: { include: { user: { select: { id: true, name: true } } } },
@@ -24,7 +27,8 @@ export class ProjectService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly userService: UserService,
-    private readonly dokploy: DokployProjectService,
+    private readonly dokployService: DokployProjectService,
+    private readonly portsService: ProjectPortService,
   ) {}
 
   async create(userId: string, dto: CreateProjectDto) {
@@ -33,7 +37,11 @@ export class ProjectService {
       branch: dto.branch,
       composePath: dto.composePath,
     };
-    const refs = await this.dokploy.create(dto.name, dto.description, source);
+    const refs = await this.dokployService.create(
+      dto.name,
+      dto.description,
+      source,
+    );
 
     try {
       const project = await this.prisma.project.create({
@@ -48,7 +56,7 @@ export class ProjectService {
       });
       return this.toResponse(project, userId);
     } catch (error) {
-      await this.dokploy.removeProject(refs.dokployProjectId);
+      await this.dokployService.removeProject(refs.dokployProjectId);
       throw error;
     }
   }
@@ -75,7 +83,7 @@ export class ProjectService {
     const { project, canManage } = await this.getAccess(userId, projectId);
     if (!canManage) throw new ForbiddenException('Only the owner can edit');
 
-    await this.dokploy.update(project.composeId, {
+    await this.dokployService.update(project.composeId, {
       name: dto.name,
       description: dto.description,
       source: {
@@ -104,14 +112,32 @@ export class ProjectService {
     if (!canManage) throw new ForbiddenException('Only the owner can delete');
 
     // Dokploy first: if it fails the project stays visible and can be retried.
-    await this.dokploy.delete(project.dokployProjectId, project.composeId);
+    await this.dokployService.delete(
+      project.dokployProjectId,
+      project.composeId,
+    );
     await this.prisma.project.delete({ where: { id: projectId } });
   }
 
-  /**
-   * Single permission gate, runs before anything talks to Dokploy. Non-members
-   * get a 404 so project ids cannot be probed.
-   */
+  async deploy(userId: string, projectId: string) {
+    const { project, canManage } = await this.getAccess(userId, projectId);
+    if (!canManage) throw new ForbiddenException('Only the owner can deploy');
+
+    const compose = await this.dokployService.readCompose(project.composeId);
+    const wanted = analyzeCompose(compose, project.composePath);
+    const ports = await this.portsService.sync(projectId, wanted);
+
+    await this.dokployService.deploy(
+      {
+        composeId: project.composeId,
+        appName: project.appName,
+        composePath: project.composePath,
+      },
+      { fileName: OVERRIDE_FILE_NAME, content: buildOverride(ports) },
+    );
+    return { ports };
+  }
+
   private async getAccess(userId: string, projectId: string) {
     const [user, project] = await Promise.all([
       this.userService.findById(userId),

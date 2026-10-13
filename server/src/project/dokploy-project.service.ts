@@ -2,8 +2,16 @@ import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import {
   composeCreate,
   composeDelete,
+  composeDeploy,
+  composeGetConvertedCompose,
+  composeLoadServices,
   composeUpdate,
 } from '../config/dokploy/generated/compose/compose.js';
+import {
+  mountsCreate,
+  mountsListByServiceId,
+  mountsUpdate,
+} from '../config/dokploy/generated/mounts/mounts.js';
 import {
   projectCreate,
   projectRemove,
@@ -88,6 +96,67 @@ export class DokployProjectService {
       name: changes.name,
       description: changes.description,
       ...this.sourceFields(changes.source ?? {}),
+    });
+  }
+
+  async readCompose(composeId: string) {
+    await composeLoadServices({ composeId, type: 'fetch' });
+    const compose = await composeGetConvertedCompose({ composeId });
+    if (typeof compose !== 'string') {
+      throw new BadGatewayException('Unexpected Dokploy compose response');
+    }
+
+    return compose;
+  }
+
+  async deploy(
+    ref: { composeId: string; appName: string; composePath: string },
+    override: { fileName: string; content: string },
+  ) {
+    await this.saveOverride(ref.composeId, override);
+    const dir = `/etc/dokploy/compose/${ref.appName}/files`;
+    await composeUpdate({
+      composeId: ref.composeId,
+      command: [
+        'compose -p',
+        ref.appName,
+        '--env-file .env',
+        `-f ${ref.composePath}`,
+        `-f ${dir}/${override.fileName}`,
+        'up -d --build --remove-orphans',
+      ].join(' '),
+    });
+    await composeDeploy({ composeId: ref.composeId, title: 'HTL-Dock deploy' });
+  }
+
+  private async saveOverride(
+    composeId: string,
+    override: { fileName: string; content: string },
+  ) {
+    const mounts: unknown = await mountsListByServiceId({
+      serviceType: 'compose',
+      serviceId: composeId,
+    });
+    const existing = Array.isArray(mounts)
+      ? (mounts as { mountId?: string; filePath?: string }[]).find(
+          (m) => m.filePath === override.fileName,
+        )
+      : undefined;
+
+    if (existing?.mountId) {
+      await mountsUpdate({
+        mountId: existing.mountId,
+        content: override.content,
+      });
+      return;
+    }
+    await mountsCreate({
+      type: 'file',
+      serviceType: 'compose',
+      serviceId: composeId,
+      filePath: override.fileName,
+      content: override.content,
+      mountPath: '/',
     });
   }
 

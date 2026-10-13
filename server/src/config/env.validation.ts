@@ -5,6 +5,8 @@ import {
   IsNotEmpty,
   IsString,
   IsUrl,
+  Max,
+  Min,
   MinLength,
   validateSync,
 } from 'class-validator';
@@ -64,6 +66,16 @@ class EnvironmentVariables {
 
   @IsNotEmpty()
   DOKPLOY_API_KEY: string;
+
+  @IsInt()
+  @Min(1024)
+  @Max(65535)
+  PROJECT_PORT_RANGE_START: number = 20000;
+
+  @IsInt()
+  @Min(1024)
+  @Max(65535)
+  PROJECT_PORT_RANGE_END: number = 29999;
 
   //CORS Configuration
   @IsUrl(URL_OPTIONS)

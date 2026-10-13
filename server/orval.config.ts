@@ -6,7 +6,7 @@ export default defineConfig({
       target: './dokploy-openapi.json',
       // Only the parts of Dokploy's API we use; widen when needed.
       filters: {
-        tags: ['project', 'environment', 'compose', 'deployment', 'docker'],
+        tags: ['project', 'environment', 'compose', 'deployment', 'docker', 'mounts'],
       },
     },
     output: {
