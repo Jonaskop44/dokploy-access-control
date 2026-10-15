@@ -16,6 +16,8 @@ import {
   projectCreate,
   projectRemove,
 } from '../config/dokploy/generated/project/project.js';
+import { DokployProjectCreateResponse } from './types/project.types.js';
+import { DokployCompose } from './types/compose.types.js';
 
 export interface GitSource {
   gitUrl: string;
@@ -29,21 +31,6 @@ export interface DokployProjectRefs {
   appName: string;
 }
 
-// Dokploy's spec leaves responses untyped, so the few fields we rely on are
-// checked here instead of being trusted.
-function pick(source: unknown, ...path: string[]): string {
-  let value: unknown = source;
-  for (const key of path) {
-    value = (value as Record<string, unknown> | null | undefined)?.[key];
-  }
-  if (typeof value !== 'string' || !value) {
-    throw new BadGatewayException(
-      `Unexpected Dokploy response: missing ${path.join('.')}`,
-    );
-  }
-  return value;
-}
-
 @Injectable()
 export class DokployProjectService {
   private readonly logger = new Logger(DokployProjectService.name);
@@ -53,20 +40,23 @@ export class DokployProjectService {
     description: string | undefined,
     source: GitSource,
   ) {
-    const created = await projectCreate({ name, description });
-    const dokployProjectId = pick(created, 'project', 'projectId');
-    const environmentId = pick(created, 'environment', 'environmentId');
+    const created = (await projectCreate({
+      name,
+      description,
+    })) as unknown as DokployProjectCreateResponse;
+    const dokployProjectId = created.project.projectId;
+    const environmentId = created.environment.environmentId;
 
     try {
-      const compose = await composeCreate({
+      const compose = (await composeCreate({
         name,
         description,
         environmentId,
         composeType: 'docker-compose',
         sourceType: 'git',
-      });
-      const composeId = pick(compose, 'composeId');
-      const appName = pick(compose, 'appName');
+      })) as unknown as DokployCompose;
+      const composeId = compose.composeId;
+      const appName = compose.appName;
 
       // Only deploys on button click, never via webhook.
       await composeUpdate({
@@ -115,6 +105,7 @@ export class DokployProjectService {
   ) {
     await this.saveOverride(ref.composeId, override);
     const dir = `/etc/dokploy/compose/${ref.appName}/files`;
+
     await composeUpdate({
       composeId: ref.composeId,
       command: [
@@ -126,6 +117,7 @@ export class DokployProjectService {
         'up -d --build --remove-orphans',
       ].join(' '),
     });
+
     await composeDeploy({ composeId: ref.composeId, title: 'HTL-Dock deploy' });
   }
 

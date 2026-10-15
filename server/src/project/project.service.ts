@@ -54,6 +54,7 @@ export class ProjectService {
         },
         include: withMembers,
       });
+
       return this.toResponse(project, userId);
     } catch (error) {
       await this.dokployService.removeProject(refs.dokployProjectId);
@@ -71,11 +72,13 @@ export class ProjectService {
       include: withMembers,
       orderBy: { createdAt: 'desc' },
     });
+
     return projects.map((project) => this.toResponse(project, userId));
   }
 
   async findOne(userId: string, projectId: string) {
     const { project } = await this.getAccess(userId, projectId);
+
     return this.toResponse(project, userId);
   }
 
@@ -104,19 +107,8 @@ export class ProjectService {
       },
       include: withMembers,
     });
+
     return this.toResponse(updated, userId);
-  }
-
-  async remove(userId: string, projectId: string) {
-    const { project, canManage } = await this.getAccess(userId, projectId);
-    if (!canManage) throw new ForbiddenException('Only the owner can delete');
-
-    // Dokploy first: if it fails the project stays visible and can be retried.
-    await this.dokployService.delete(
-      project.dokployProjectId,
-      project.composeId,
-    );
-    await this.prisma.project.delete({ where: { id: projectId } });
   }
 
   async deploy(userId: string, projectId: string) {
@@ -135,7 +127,19 @@ export class ProjectService {
       },
       { fileName: OVERRIDE_FILE_NAME, content: buildOverride(ports) },
     );
+
     return { ports };
+  }
+
+  async remove(userId: string, projectId: string) {
+    const { project, canManage } = await this.getAccess(userId, projectId);
+    if (!canManage) throw new ForbiddenException('Only the owner can delete');
+
+    await this.dokployService.delete(
+      project.dokployProjectId,
+      project.composeId,
+    );
+    await this.prisma.project.delete({ where: { id: projectId } });
   }
 
   private async getAccess(userId: string, projectId: string) {
@@ -146,11 +150,13 @@ export class ProjectService {
         include: withMembers,
       }),
     ]);
+
     const membership = project?.members.find((m) => m.userId === userId);
     const isTeacher = user.role === Role.TEACHER;
     if (!project || (!membership && !isTeacher)) {
       throw new NotFoundException('Project not found');
     }
+
     return {
       project,
       canManage: isTeacher || membership?.role === ProjectRole.OWNER,

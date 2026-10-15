@@ -1,5 +1,3 @@
-import type { DeployStatus } from '../project-status.js';
-
 export interface DokployCompose {
   composeId: string;
   name: string;
@@ -38,7 +36,7 @@ export interface DokployCompose {
   isolatedDeployment: boolean;
   isolatedDeploymentsVolume: boolean;
   triggerType: 'push' | 'tag' | null;
-  composeStatus: DeployStatus;
+  composeStatus: string;
   icon: string | null;
   environmentId: string;
   createdAt: string;
