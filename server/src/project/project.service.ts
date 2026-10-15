@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -8,6 +9,7 @@ import { Prisma } from '../config/prisma/generated/client.js';
 import { ProjectRole, Role } from '../config/prisma/generated/enums.js';
 import { UserService } from '../user/user.service.js';
 import type { CreateProjectDto } from './dto/create-project.dto.js';
+import type { ProjectStatus } from './dto/project-status-response.dto.js';
 import type { UpdateProjectDto } from './dto/update-project.dto.js';
 import { analyzeCompose } from './compose/analyze-compose.js';
 import { buildOverride, OVERRIDE_FILE_NAME } from './compose/build-override.js';
@@ -131,6 +133,30 @@ export class ProjectService {
     return { ports };
   }
 
+  async start(userId: string, projectId: string) {
+    const { project } = await this.getAccess(userId, projectId);
+    await this.assertDeployed(project);
+
+    await this.dokployService.start(project.composeId);
+
+    return this.readStatus(project);
+  }
+
+  async stop(userId: string, projectId: string) {
+    const { project } = await this.getAccess(userId, projectId);
+    await this.assertDeployed(project);
+
+    await this.dokployService.stop(project.composeId);
+
+    return this.readStatus(project);
+  }
+
+  async getStatus(userId: string, projectId: string) {
+    const { project } = await this.getAccess(userId, projectId);
+
+    return this.readStatus(project);
+  }
+
   async remove(userId: string, projectId: string) {
     const { project, canManage } = await this.getAccess(userId, projectId);
     if (!canManage) throw new ForbiddenException('Only the owner can delete');
@@ -140,6 +166,31 @@ export class ProjectService {
       project.composeId,
     );
     await this.prisma.project.delete({ where: { id: projectId } });
+  }
+
+  private async assertDeployed(project: ProjectWithMembers) {
+    const { status } = await this.readStatus(project);
+    if (status === 'NOT_DEPLOYED') {
+      throw new ConflictException('Project has not been deployed yet');
+    }
+  }
+
+  private async readStatus(project: ProjectWithMembers) {
+    const { composeStatus, containers, hasDeployments } =
+      await this.dokployService.readStatus(project.composeId, project.appName);
+    const running = containers.some((c) => c.state === 'running');
+
+    let status: ProjectStatus;
+    if (composeStatus === 'running') status = 'DEPLOYING';
+    else if (composeStatus === 'error') status = 'ERROR';
+    else if (running) status = 'RUNNING';
+    else if (composeStatus === 'done') status = 'ERROR';
+    else status = hasDeployments ? 'STOPPED' : 'NOT_DEPLOYED';
+
+    return {
+      status,
+      containers: containers.map((c) => ({ name: c.name, state: c.state })),
+    };
   }
 
   private async getAccess(userId: string, projectId: string) {

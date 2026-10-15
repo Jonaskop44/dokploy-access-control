@@ -23,6 +23,7 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard.js';
 import { DeployResponseDto } from './dto/deploy-response.dto.js';
 import { CreateProjectDto } from './dto/create-project.dto.js';
 import { ProjectResponseDto } from './dto/project-response.dto.js';
+import { ProjectStatusResponseDto } from './dto/project-status-response.dto.js';
 import { UpdateProjectDto } from './dto/update-project.dto.js';
 import { ProjectService } from './project.service.js';
 
@@ -75,6 +76,47 @@ export class ProjectController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.projectService.deploy(userId, id);
+  }
+
+  @Post(':id/start')
+  @HttpCode(HttpStatus.OK)
+  @SerializeOptions({
+    type: ProjectStatusResponseDto,
+    excludeExtraneousValues: true,
+  })
+  @ApiOkResponse({ type: ProjectStatusResponseDto })
+  start(
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.projectService.start(userId, id);
+  }
+
+  @Post(':id/stop')
+  @HttpCode(HttpStatus.OK)
+  @SerializeOptions({
+    type: ProjectStatusResponseDto,
+    excludeExtraneousValues: true,
+  })
+  @ApiOkResponse({ type: ProjectStatusResponseDto })
+  stop(
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.projectService.stop(userId, id);
+  }
+
+  @Get(':id/status')
+  @SerializeOptions({
+    type: ProjectStatusResponseDto,
+    excludeExtraneousValues: true,
+  })
+  @ApiOkResponse({ type: ProjectStatusResponseDto })
+  getStatus(
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.projectService.getStatus(userId, id);
   }
 
   @Delete(':id')

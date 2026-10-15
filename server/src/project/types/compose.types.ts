@@ -48,3 +48,9 @@ export interface DokployCompose {
   serverId: string | null;
   serviceNetworks: unknown[];
 }
+
+export interface DokployContainer {
+  containerId: string;
+  name: string;
+  state: string;
+}

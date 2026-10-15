@@ -5,8 +5,13 @@ import {
   composeDeploy,
   composeGetConvertedCompose,
   composeLoadServices,
+  composeOne,
+  composeStart,
+  composeStop,
   composeUpdate,
 } from '../config/dokploy/generated/compose/compose.js';
+import { deploymentAllByCompose } from '../config/dokploy/generated/deployment/deployment.js';
+import { dockerGetContainersByAppNameMatch } from '../config/dokploy/generated/docker/docker.js';
 import {
   mountsCreate,
   mountsListByServiceId,
@@ -17,7 +22,7 @@ import {
   projectRemove,
 } from '../config/dokploy/generated/project/project.js';
 import { DokployProjectCreateResponse } from './types/project.types.js';
-import { DokployCompose } from './types/compose.types.js';
+import { DokployCompose, DokployContainer } from './types/compose.types.js';
 
 export interface GitSource {
   gitUrl: string;
@@ -119,6 +124,31 @@ export class DokployProjectService {
     });
 
     await composeDeploy({ composeId: ref.composeId, title: 'HTL-Dock deploy' });
+  }
+
+  async start(composeId: string) {
+    await composeStart({ composeId });
+  }
+
+  async stop(composeId: string) {
+    await composeStop({ composeId });
+  }
+
+  async readStatus(composeId: string, appName: string) {
+    const [compose, containers] = await Promise.all([
+      composeOne({ composeId }) as unknown as Promise<DokployCompose>,
+      dockerGetContainersByAppNameMatch({
+        appType: 'docker-compose',
+        appName,
+      }) as unknown as Promise<DokployContainer[]>,
+    ]);
+    const deployments: unknown = await deploymentAllByCompose({ composeId });
+
+    return {
+      composeStatus: compose.composeStatus,
+      containers: Array.isArray(containers) ? containers : [],
+      hasDeployments: Array.isArray(deployments) && deployments.length > 0,
+    };
   }
 
   private async saveOverride(
