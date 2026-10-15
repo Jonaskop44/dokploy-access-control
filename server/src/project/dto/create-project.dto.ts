@@ -12,7 +12,6 @@ import {
 const trim = ({ value }: { value: unknown }): unknown =>
   typeof value === 'string' ? value.trim() : value;
 
-// Relative path inside the repo; `..` segments could escape the clone.
 const SAFE_RELATIVE_PATH = /^(?!\/)(?!.*(^|\/)\.\.(\/|$))[\w.\-/]+$/;
 
 export class CreateProjectDto {
