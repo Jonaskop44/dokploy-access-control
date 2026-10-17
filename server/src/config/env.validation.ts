@@ -20,7 +20,7 @@ class EnvironmentVariables {
   NODE_ENV = 'development';
 
   @IsInt()
-  PORT: number = 4000;
+  PORT: number;
 
   //Database Configuration
   @IsUrl({ ...URL_OPTIONS, protocols: ['postgresql', 'postgres'] })
@@ -32,17 +32,17 @@ class EnvironmentVariables {
   JWT_ACCESS_SECRET: string;
 
   @IsString()
-  JWT_ACCESS_EXPIRES_IN: string = '15m';
+  JWT_ACCESS_EXPIRES_IN: string;
 
   @IsString()
   @MinLength(32)
   JWT_REFRESH_SECRET: string;
 
   @IsString()
-  JWT_REFRESH_EXPIRES_IN: string = '7d';
+  JWT_REFRESH_EXPIRES_IN: string;
 
   @IsString()
-  JWT_REFRESH_SESSION_EXPIRES_IN: string = '1d';
+  JWT_REFRESH_SESSION_EXPIRES_IN: string;
 
   //Entra ID Configuration
   @IsString()
@@ -70,12 +70,16 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1024)
   @Max(65535)
-  PROJECT_PORT_RANGE_START: number = 20000;
+  PROJECT_PORT_RANGE_START: number;
 
   @IsInt()
   @Min(1024)
   @Max(65535)
-  PROJECT_PORT_RANGE_END: number = 29999;
+  PROJECT_PORT_RANGE_END: number;
+
+  @IsString()
+  @IsNotEmpty()
+  GLOBAL_LIMIT_ID: string;
 
   //CORS Configuration
   @IsUrl(URL_OPTIONS)

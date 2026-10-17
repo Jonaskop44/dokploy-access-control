@@ -81,6 +81,10 @@ export class AppConfigService {
     };
   }
 
+  get globalLimitId(): string {
+    return this.configService.getOrThrow('GLOBAL_LIMIT_ID');
+  }
+
   //CORS Configuration
   get frontendUrl(): string {
     return this.configService.getOrThrow('FRONTEND_URL');
