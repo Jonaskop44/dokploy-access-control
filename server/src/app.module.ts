@@ -13,6 +13,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { PrismaModule } from './config/prisma/prisma.module.js';
 import { DokployModule } from './config/dokploy/dokploy.module.js';
 import { ProjectModule } from './project/project.module.js';
+import { LimitModule } from './limit/limit.module.js';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ProjectModule } from './project/project.module.js';
     DokployModule,
     AuthModule,
     ProjectModule,
+    LimitModule,
   ],
   controllers: [],
   providers: [

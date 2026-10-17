@@ -21,7 +21,7 @@ const isObj = (value: unknown): value is Obj =>
 export function analyzeCompose(
   yamlText: string,
   composePath: string,
-): ComposePort[] {
+): { ports: ComposePort[]; serviceNames: string[] } {
   let doc: unknown;
   try {
     doc = parse(yamlText);
@@ -42,6 +42,7 @@ export function analyzeCompose(
 
   const violations: string[] = [];
   const ports = new Map<string, ComposePort>();
+  const serviceNames: string[] = [];
   const composeDir = posix.dirname(composePath.replaceAll('\\', '/'));
 
   // Pulls in files this check never sees.
@@ -49,6 +50,7 @@ export function analyzeCompose(
 
   for (const [serviceName, rawService] of Object.entries(doc.services)) {
     if (!isObj(rawService)) continue;
+    serviceNames.push(serviceName);
     const reject = (reason: string) =>
       violations.push(`${serviceName}: ${reason}`);
 
@@ -102,7 +104,7 @@ export function analyzeCompose(
       violations,
     });
   }
-  return [...ports.values()];
+  return { ports: [...ports.values()], serviceNames };
 }
 
 /** Returns a reason when the volume is forbidden, otherwise undefined. */

@@ -12,7 +12,6 @@ export class EntraService {
   private readonly client: ConfidentialClientApplication;
 
   constructor(private readonly appConfig: AppConfigService) {
-    // A tenant-specific authority restricts sign-in to this directory only.
     this.client = new ConfidentialClientApplication({
       auth: {
         clientId: appConfig.entraClientId,

@@ -6,12 +6,14 @@ import {
   composeGetConvertedCompose,
   composeLoadServices,
   composeOne,
-  composeStart,
   composeStop,
   composeUpdate,
 } from '../config/dokploy/generated/compose/compose.js';
 import { deploymentAllByCompose } from '../config/dokploy/generated/deployment/deployment.js';
-import { dockerGetContainersByAppNameMatch } from '../config/dokploy/generated/docker/docker.js';
+import {
+  dockerGetContainersByAppNameMatch,
+  dockerStartContainer,
+} from '../config/dokploy/generated/docker/docker.js';
 import {
   mountsCreate,
   mountsListByServiceId,
@@ -20,6 +22,7 @@ import {
 import {
   projectCreate,
   projectRemove,
+  projectUpdate,
 } from '../config/dokploy/generated/project/project.js';
 import { DokployProjectCreateResponse } from './types/project.types.js';
 import { DokployCompose, DokployContainer } from './types/compose.types.js';
@@ -79,18 +82,24 @@ export class DokployProjectService {
   }
 
   async update(
-    composeId: string,
+    refs: { dokployProjectId: string; composeId: string },
     changes: {
-      name?: string;
-      description?: string | null;
-      source?: Partial<GitSource>;
+      name: string;
+      description?: string;
+      source: GitSource;
     },
   ) {
+    const { dokployProjectId, composeId } = refs;
+    await projectUpdate({
+      projectId: dokployProjectId,
+      name: changes.name,
+      description: changes.description,
+    });
     await composeUpdate({
       composeId,
       name: changes.name,
       description: changes.description,
-      ...this.sourceFields(changes.source ?? {}),
+      ...this.sourceFields(changes.source),
     });
   }
 
@@ -126,8 +135,19 @@ export class DokployProjectService {
     await composeDeploy({ composeId: ref.composeId, title: 'HTL-Dock deploy' });
   }
 
-  async start(composeId: string) {
-    await composeStart({ composeId });
+  async start(appName: string) {
+    const containers = (await dockerGetContainersByAppNameMatch({
+      appType: 'docker-compose',
+      appName,
+    })) as unknown as DokployContainer[];
+
+    await Promise.all(
+      (Array.isArray(containers) ? containers : [])
+        .filter((container) => container.state !== 'running')
+        .map((container) =>
+          dockerStartContainer({ containerId: container.containerId }),
+        ),
+    );
   }
 
   async stop(composeId: string) {

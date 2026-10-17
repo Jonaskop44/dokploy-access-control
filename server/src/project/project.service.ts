@@ -2,6 +2,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../config/prisma/prisma.service.js';
@@ -13,6 +14,7 @@ import type { ProjectStatus } from './dto/project-status-response.dto.js';
 import type { UpdateProjectDto } from './dto/update-project.dto.js';
 import { analyzeCompose } from './compose/analyze-compose.js';
 import { buildOverride, OVERRIDE_FILE_NAME } from './compose/build-override.js';
+import { LimitService } from '../limit/limit.service.js';
 import { DokployProjectService } from './dokploy-project.service.js';
 import { ProjectPortService } from './project-port.service.js';
 
@@ -31,9 +33,12 @@ export class ProjectService {
     private readonly userService: UserService,
     private readonly dokployService: DokployProjectService,
     private readonly portsService: ProjectPortService,
+    private readonly limitService: LimitService,
   ) {}
 
   async create(userId: string, dto: CreateProjectDto) {
+    await this.assertProjectLimit(userId);
+
     const source = {
       gitUrl: dto.gitUrl,
       branch: dto.branch,
@@ -88,7 +93,7 @@ export class ProjectService {
     const { project, canManage } = await this.getAccess(userId, projectId);
     if (!canManage) throw new ForbiddenException('Only the owner can edit');
 
-    await this.dokployService.update(project.composeId, {
+    await this.dokployService.update(project, {
       name: dto.name,
       description: dto.description,
       source: {
@@ -114,12 +119,24 @@ export class ProjectService {
   }
 
   async deploy(userId: string, projectId: string) {
-    const { project, canManage } = await this.getAccess(userId, projectId);
+    const { project, canManage, isTeacher } = await this.getAccess(
+      userId,
+      projectId,
+    );
     if (!canManage) throw new ForbiddenException('Only the owner can deploy');
 
+    const { status } = await this.readStatus(project);
+    await this.assertRunLimit(project, isTeacher, status);
+
     const compose = await this.dokployService.readCompose(project.composeId);
-    const wanted = analyzeCompose(compose, project.composePath);
+    const { ports: wanted, serviceNames } = analyzeCompose(
+      compose,
+      project.composePath,
+    );
     const ports = await this.portsService.sync(projectId, wanted);
+    const limits = await this.limitService.resolve(
+      await this.getOwner(project),
+    );
 
     await this.dokployService.deploy(
       {
@@ -127,17 +144,24 @@ export class ProjectService {
         appName: project.appName,
         composePath: project.composePath,
       },
-      { fileName: OVERRIDE_FILE_NAME, content: buildOverride(ports) },
+      {
+        fileName: OVERRIDE_FILE_NAME,
+        content: buildOverride(ports, serviceNames, limits),
+      },
     );
 
     return { ports };
   }
 
   async start(userId: string, projectId: string) {
-    const { project } = await this.getAccess(userId, projectId);
-    await this.assertDeployed(project);
+    const { project, isTeacher } = await this.getAccess(userId, projectId);
+    const { status } = await this.readStatus(project);
+    if (status === 'NOT_DEPLOYED') {
+      throw new ConflictException('Project has not been deployed yet');
+    }
+    await this.assertRunLimit(project, isTeacher, status);
 
-    await this.dokployService.start(project.composeId);
+    await this.dokployService.start(project.appName);
 
     return this.readStatus(project);
   }
@@ -175,7 +199,65 @@ export class ProjectService {
     }
   }
 
-  private async readStatus(project: ProjectWithMembers) {
+  // Only creating and starting are blocked; running projects stay up. A group
+  // project counts against its owner, and teachers are exempt.
+  private async assertProjectLimit(userId: string) {
+    const user = await this.userService.findById(userId);
+    if (user.role === Role.TEACHER) return;
+
+    const [limits, owned] = await Promise.all([
+      this.limitService.resolve(user),
+      this.prisma.projectMember.count({
+        where: { userId, role: ProjectRole.OWNER },
+      }),
+    ]);
+
+    if (owned >= limits.maxProjects) {
+      throw new ForbiddenException(
+        `Project limit reached (${limits.maxProjects}). Contact your teacher.`,
+      );
+    }
+  }
+
+  private async assertRunLimit(
+    project: ProjectWithMembers,
+    isTeacher: boolean,
+    status: ProjectStatus,
+  ) {
+    if (isTeacher || status === 'RUNNING' || status === 'DEPLOYING') return;
+
+    const owner = await this.getOwner(project);
+    const [limits, others] = await Promise.all([
+      this.limitService.resolve(owner),
+      this.prisma.project.findMany({
+        where: {
+          id: { not: project.id },
+          members: { some: { userId: owner.id, role: ProjectRole.OWNER } },
+        },
+      }),
+    ]);
+    const statuses = await Promise.all(others.map((p) => this.readStatus(p)));
+    const running = statuses.filter(
+      (s) => s.status === 'RUNNING' || s.status === 'DEPLOYING',
+    ).length;
+
+    if (running >= limits.maxRunningProjects) {
+      throw new ForbiddenException(
+        `Running project limit reached (${limits.maxRunningProjects}). Stop another project or contact your teacher.`,
+      );
+    }
+  }
+
+  private async getOwner(project: ProjectWithMembers) {
+    const owner = project.members.find((m) => m.role === ProjectRole.OWNER);
+    if (!owner) throw new InternalServerErrorException('Project has no owner');
+
+    return this.userService.findById(owner.userId);
+  }
+
+  private async readStatus(
+    project: Pick<ProjectWithMembers, 'composeId' | 'appName'>,
+  ) {
     const { composeStatus, containers, hasDeployments } =
       await this.dokployService.readStatus(project.composeId, project.appName);
     const running = containers.some((c) => c.state === 'running');
@@ -210,6 +292,7 @@ export class ProjectService {
 
     return {
       project,
+      isTeacher,
       canManage: isTeacher || membership?.role === ProjectRole.OWNER,
     };
   }
