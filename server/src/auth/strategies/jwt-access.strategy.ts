@@ -7,13 +7,13 @@ import { JwtPayload } from '../types/auth-jwtPayload.js';
 
 @Injectable()
 export class JwtAccessStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(appConfigService: AppConfigService) {
+  constructor(appConfig: AppConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request) => req?.cookies?.accessToken ?? null,
       ]),
       ignoreExpiration: false,
-      secretOrKey: appConfigService.jwtAccessSecret,
+      secretOrKey: appConfig.jwtAccessSecret,
     });
   }
 

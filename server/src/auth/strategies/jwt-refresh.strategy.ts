@@ -13,7 +13,7 @@ export class JwtRefreshStrategy extends PassportStrategy(
   'jwt-refresh',
 ) {
   constructor(
-    appConfigService: AppConfigService,
+    appConfig: AppConfigService,
     private readonly userService: UserService,
     private readonly sessionService: SessionService,
   ) {
@@ -22,7 +22,7 @@ export class JwtRefreshStrategy extends PassportStrategy(
         (req: Request) => req?.cookies?.refreshToken ?? null,
       ]),
       ignoreExpiration: false,
-      secretOrKey: appConfigService.jwtRefreshSecret,
+      secretOrKey: appConfig.jwtRefreshSecret,
       passReqToCallback: true,
     });
   }
